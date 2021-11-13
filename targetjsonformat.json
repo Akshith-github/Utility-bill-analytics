@@ -1,0 +1,40 @@
+{
+    "store_name": "Lucky Restaurant",
+    "store_description": "Family Dinning",
+    "store_address": "Nagole, Hyderabad, Telangna, 500083",
+    "store_gstin": "xXXXXXXXXXXXXXX",
+    "bill_identifier": "CRN3/1/00000014",
+    "bill_date": "03/Jul/2019",
+    "bill_meta_data": {
+        "uid": "admin",
+        "table_no": 24,
+        "kot_no": 29.33
+    },
+    "bill_items": [{
+            "item_name": "Crispy Chilli co",
+            "quantity": 1,
+            "unit_price": 200.00,
+            "total_price": 200.00
+        },{
+            "item_name": "andori Murgh H",
+            "quantity": 2,
+            "unit_price": 190.00,
+            "total_price": 380.00
+        }],
+    "sub_total": 580.007,
+    "taxes": [{
+            "type": "CGST",
+            "rate": "2.5",
+            "amount": "9.29"
+        },{
+            "type": "86ST",
+            "rate": "2.5",
+            "amount": "9.29"
+        }],
+    "total_tax": "18.58",
+    "total_paid": "390.00",
+    "bill_meta": {
+        "key_1": "valuexxx",
+        "key_2": "valueXYY"
+    }
+}

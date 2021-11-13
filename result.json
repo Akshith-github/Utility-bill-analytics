@@ -1,0 +1,40 @@
+{
+    "store_name": "Lucky Restaurant",
+    "store_description": "FAMILY DINNING",
+    "store_address": "NAGoLE,hyderabad, TELANGANA 500083",
+    "store_gstin": "364AHFL09736129",
+    "bill_identifier": "LRN5/1/00000014",
+    "bill_date": "2019-07-03",
+    "bill_meta_data": {
+        "uid": "ADMIN",
+        "table_no": "24",
+        "kot_no": "28,33"
+    },
+    "bill_items": [{
+        "item_name": "CRISPV ChiLLI Co",
+        "Qty": 1.0,
+        "Price": 200.0,
+        "Amount": 200.0
+    }, {
+        "item_name": "TANDO DrI MuRGH",
+        "Qty": 1.0,
+        "Price": 190.0,
+        "Amount": 190.0
+    }],
+    "sub_total": 390.0,
+    "taxes": [{
+        "type": "CGST",
+        "rate": 0.0,
+        "amount": 0.0
+    }, {
+        "type": "SGST",
+        "rate": 0.0,
+        "amount": 0.0
+    }],
+    "total_tax": 0.0,
+    "total_paid": 390.0,
+    "bill_meta": {
+        "key_0": "valuexxx",
+        "key_1": "valueyyy"
+    }
+}

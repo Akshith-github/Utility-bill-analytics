@@ -1,6 +1,3 @@
-#special thanks to github copilot for this code development
-#and github.com/sahilbansal for his help
-# and thw microsoft team for their help in development of vs code and github tools and services.
 import easyocr as ocr
 import streamlit as st  
 from PIL import Image , ImageDraw
@@ -12,6 +9,8 @@ import pandas as pd
 # import as go from plotly
 import plotly.express as px
 import plotly.graph_objects as go
+import json
+import datetime
 
 st.set_page_config(layout='wide')
 # float_cond lambda function to check given text is float or number or not
@@ -85,10 +84,8 @@ if choice == "Easy Ocr":
         #     "store_gstin": "xXXXXXXXXXXXXXX",
         #     "uid": "admin",
         #     "table_no": 24,
-        #     "kat_no": 29.33
-        # },
-
-        
+        #     "kot_no": 29.33
+        # },   
         
         
         
@@ -110,20 +107,6 @@ if choice == "Easy Ocr":
             else:
                 store_description = " ".join(store_description)
                 store_description = st.text_input("Enter Store Description",store_description)
-            # similarly for bill identifier we need to first have selectbox followed by text input box
-            bill_identifier = st.multiselect("Select Bill Identifier",result_text+["Enter Manually"])
-            if bill_identifier == ["Enter Manually"]:
-                bill_identifier = st.text_input("Enter Bill Identifier")
-            else:
-                bill_identifier = " ".join(bill_identifier)
-                bill_identifier = st.text_input("Enter Bill Identifier",bill_identifier)
-            # similarly for bill date we need to first have selectbox followed by text input box
-            bill_date = st.multiselect("Select Bill Date",result_text+["Enter Manually"])
-            if bill_date == ["Enter Manually"]:
-                bill_date = st.text_input("Enter Bill Date")
-            else:
-                bill_date = " ".join(bill_date)
-                bill_date = st.text_input("Enter Bill Date",bill_date)
             # similarly for store address we need to first have selectbox followed by text input box
             store_address = st.multiselect("Select Store Address",result_text+["Enter Manually"])
             if store_address == ["Enter Manually"]:
@@ -138,6 +121,21 @@ if choice == "Easy Ocr":
             else:
                 store_gstin = " ".join(store_gstin)
                 store_gstin = st.text_input("Enter Store GSTIN",store_gstin)
+            # similarly for bill identifier we need to first have selectbox followed by text input box
+            bill_identifier = st.multiselect("Select Bill Identifier",result_text+["Enter Manually"])
+            if bill_identifier == ["Enter Manually"]:
+                bill_identifier = st.text_input("Enter Bill Identifier")
+            else:
+                bill_identifier = " ".join(bill_identifier)
+                bill_identifier = st.text_input("Enter Bill Identifier",bill_identifier)
+            # similarly for bill date we need to first have selectbox followed by text input box
+            bill_date = st.multiselect("Select Bill Date",result_text+["Enter Manually"])
+            # if bill_date == ["Enter Manually"]:
+            #     bill_date = st.text_input("Enter Bill Date")
+            # else:
+            #     bill_date = " ".join(bill_date)
+            #     bill_date = st.text_input("Enter Bill Date",bill_date)
+            bill_date = st.date_input("Enter Bill Date",datetime.datetime.now())
             # similarly for uid we need to first have selectbox followed by text input box
             uid = st.multiselect("Select UID",result_text+["Enter Manually"])
             if uid == ["Enter Manually"]:
@@ -152,24 +150,24 @@ if choice == "Easy Ocr":
             else:
                 table_no = " ".join(table_no)
                 table_no = st.text_input("Enter Table Number",table_no)
-            # similarly for kat_no we need to first have selectbox followed by text input box
-            kat_no = st.multiselect("Select KAT Number",result_text+["Enter Manually"])
-            if kat_no == ["Enter Manually"]:
-                kat_no = st.text_input("Enter KAT Number")
+            # similarly for kot_no we need to first have selectbox followed by text input box
+            kot_no = st.multiselect("Select KAT Number",result_text+["Enter Manually"])
+            if kot_no == ["Enter Manually"]:
+                kot_no = st.text_input("Enter KAT Number")
             else:
-                kat_no = " ".join(kat_no)
-                kat_no = st.text_input("Enter KAT Number",kat_no)
+                kot_no = " ".join(kot_no)
+                kot_no = st.text_input("Enter KAT Number",kot_no)
             
             bill_store_data = {"store_name": store_name,
                 "store description": store_description,
                 "bill_identifier": bill_identifier,
                 "bill_date": bill_date,
+                "store address": store_address,
+                "store_gstin": store_gstin,
                 "bill_meta_data": {
-                    "store address": store_address,
-                    "store_gstin": store_gstin,
                     "uid": uid,
                     "table_no": table_no,
-                    "kat_no": kat_no
+                    "kot_no": kot_no
                 }}
         st.write(bill_store_data)
 
@@ -203,8 +201,11 @@ if choice == "Easy Ocr":
                     else:
                         st.error("Text preceding items list in bill is not identified")
                     break
-
-            title_inp = st.text_input('Items preceding text',assumed_title_input )
+            
+            if assumed_title_input:
+                title_inp = st.selectbox('Items preceding text',result_text,index=result_text.index(assumed_title_input))
+            else:
+                title_inp = st.text_input("Enter Items preceding text")
             st.write('Items preceding text is', title_inp)
             #check if title_inp is in result_text else make title_inp = title_inp[1:-1] and check
             try:
@@ -327,7 +328,222 @@ if choice == "Easy Ocr":
                 "item_name":items_[i],
                 **{feature_name[j]:float(items_values_dict[i][j]) for j in range(no_of_values)}}
         st.write('Items json :',items_json)
+        """### Subtotal """
+        subtotal_value=0
+        with st.expander("subtotal"):
+            # user select one feature for subtotal
+            subtotal_feature = st.multiselect('Select subtotal feature',list(feature_name.values()),default=list(feature_name.values())[-1])
+            # if user select more than 2 columns then show error
+            if len(subtotal_feature)>2:
+                st.error('Please select only one feature for subtotal')
+            else:
+                # if user select more than 1 column then multiply the values of column1 with column2 numpy array multiplication
+                if len(subtotal_feature)==2:
+                    subtotal_value = np.multiply(items_df[subtotal_feature[0]].values,items_df[subtotal_feature[1]].values)
+                    st.write('Subtotal feature :',subtotal_feature,subtotal_value)
+                    subtotal_value = subtotal_value.sum()
+                elif len(subtotal_feature)==1:
+                    subtotal_value = items_df[subtotal_feature[0]].sum()
+                else:
+                    pass
+                st.write('Subtotal :',subtotal_value)
+                #take subtotal value input from user as confirmation, keep calculated value as default
+        subtotal_value = st.number_input('Subtotal',subtotal_value)
+        st.write('Subtotal :',subtotal_value)
         
+
+        """### Taxes """
+        #final Output
+        #{   
+        #     "type": "CGST",
+        #     "rate": "2.5",
+        #     "amount": "9.29"
+        # },
+        # {   
+        #     "type": "86ST",
+        #     "rate": "2.5",
+        #     "amount": "9.29"
+        # }
+        # prompt user with three inputs tax type, rate and amount
+        
+        tax_list = []
+        with st.expander("taxes"):
+            no_of_taxes = st.slider('No of taxes',1,10,1)
+            taxlist=[{'type':'','rate':0.0,'amount':0.0} for i in range(no_of_taxes)]
+            # with three columsn ask user to enter tax type, rate and amount for each tax
+            tax_columns = st.columns(3)
+            for i,tax in enumerate(taxlist):
+                tax_columns[0].write('Tax type')
+                tax['type'] = tax_columns[0].text_input('Tax type '+str(i),tax['type'])
+                tax_columns[1].write('Tax rate')
+                tax['rate'] = tax_columns[1].number_input('Tax rate '+str(i),tax['rate'],step=1.,format="%.2f")
+                tax_columns[2].write('Tax amount')
+                tax['amount'] = tax_columns[2].number_input('Tax amount '+str(i),tax['amount'],step=1.,format="%.2f")
+                tax_list.append(tax)
+        st.write('Taxes :',tax_list)
+        # calculate tax amount
+        tax_amount = 0
+        for tax in tax_list:
+            tax_amount += tax['amount']
+        st.write('Tax amount :',tax_amount)
+
+        """### Total """
+        # final Output
+        # {
+        #     "subtotal": "100",
+        #     "taxes": [
+        #         {
+        #             "type": "CGST",
+        #             "rate": "2.5",
+        #             "amount": "9.29"
+        #         },
+        #         {
+        #             "type": "86ST",
+        #             "rate": "2.5",
+        #             "amount": "9.29"
+        #         }
+        #     ],
+        #     "total": "109.29"
+        # }
+        # prompt user with subtotal, tax amount and total amount
+        total_columns = st.columns(3)
+        total_columns[0].write('Subtotal')
+        subtotal_value = total_columns[0].number_input('Sub total',subtotal_value)
+        total_columns[1].write('Tax amount')
+        tax_amount = total_columns[1].number_input('Tax amount',tax_amount)
+        #check box in column 1 along with tax amount to get wether tax is inclusive or not
+        tax_inclusive = total_columns[1].checkbox('Tax inclusive',False)
+        if not tax_inclusive:
+            total_amount = subtotal_value + tax_amount
+        else:
+            total_amount = subtotal_value
+        total_columns[2].write('Total')
+        total_amount = total_columns[2].number_input('Total',total_amount)
+        st.write('Total :',total_amount)
+            
+        # Similar to taxes dict now bill meta dictionary
+        # "bill_meta": { 
+        #         "key_1": "valuexxx",
+        #         "key_2": "valueXYY"
+        #     }
+        bill_meta = {}
+        with st.expander("bill meta"):
+            # slider to get number of key value pairs
+            no_of_meta = st.slider('No of meta',1,10,1)
+            # meta_columns = st.columns(2)
+            for i in range(no_of_meta):
+                # meta_columns[0].write('Key')
+                key = "key_"+str(i)
+                # meta_columns[0].write(key)
+                # meta_columns[1].write('Value')
+                value = st.text_input('Value '+str(i),'')
+                bill_meta[key] = value
+            st.write('Bill meta :',bill_meta)
+        #finally show the output in json format
+        #{
+        #     "store_name": "Lucky Restaurant", 
+        #     "store_description": "Family Dinning", 
+        #     "store address": "Nagole, Hyderabad, Telangna, 500083", 
+        #     "store_gstin": "xXXXXXXXXXXXXXX",
+        #     "bill_identifier": "CRN3/1/00000014", 
+        #     "bill_date": "03/Jul/2019", 
+        #     "bill_meta_data": {
+        #         "uid": "admin",
+        #         "table_no": 24,
+        #         "kot_no": 29.33
+        #     },
+        #     "bill_items": [
+        #         {
+        #             "item_name":"Crispy Chilli co", 
+        #             "quantity": 1,
+        #             "unit_price": 200.00, 
+        #             "total_price": 200.00
+        #         },
+        #         {
+        #             "item_name": "andori Murgh H",
+        #             "quantity": 2, 
+        #             "unit_price": 190.00,
+        #             "total_price": 380.00
+        #         }
+        #     ],
+        #     "sub_total": 580.007,
+        #     "taxes": [
+        #         {   
+        #             "type": "CGST",
+        #             "rate": "2.5",
+        #             "amount": "9.29"
+        #         },
+        #         {   
+        #             "type": "86ST",
+        #             "rate": "2.5",
+        #             "amount": "9.29"
+        #         }
+        #     ],
+        #     "total_tax": "18.58",
+        #     "total_paid": "390.00", 
+        #     "bill_meta": { 
+        #         "key_1": "valuexxx",
+        #         "key_2": "valueXYY"
+        #     }
+        # } in this format
+
+        with st.expander("finalize"):
+            #create a dictionary to store all the values
+            bill_dict = {}
+            bill_dict['store_name'] = st.text_input('Store name',store_name)
+            bill_dict['store_description'] = st.text_input('Store description',store_description)
+            bill_dict['store_address'] = st.text_input('Store address',store_address)
+            bill_dict['store_gstin'] = st.text_input('Store gstin',store_gstin)
+            bill_dict['bill_identifier'] = st.text_input('Bill identifier',bill_identifier)
+            bill_dict['bill_date'] = st.text_input('Bill date',bill_date)
+            bill_dict['bill_meta_data'] = {}
+            bill_dict['bill_meta_data']['uid'] = st.text_input('uid',uid)
+            bill_dict['bill_meta_data']['table_no'] = st.text_input('Table no',table_no)
+            bill_dict['bill_meta_data']['kot_no'] = st.text_input('Kot no',kot_no)
+            bill_dict['bill_items'] = []
+            st.write(items_df) 
+            # with use of itemsdf and columns ask user to enter item name, quantity, unit price and total price
+            item_columns = st.columns(len(items_df.columns))
+            for i,item in enumerate(items_df.values):
+                item_dict = {}
+                # item_dict['item_name'] = item_columns[0].text_input('Item name '+str(i),item[0])
+                # instead of hardcoding the features as it use feature_name and iterate over it
+                for j,feature in enumerate(items_df.columns):
+                    if feature == 'item_name':
+                        item_dict['item_name'] = item_columns[j].text_input('Item name '+str(i),item[j])
+                    else:
+                        item_dict[feature] = item_columns[j].number_input(feature+' '+str(i+1),item[j])
+                bill_dict['bill_items'].append(item_dict)
+            
+            bill_dict['sub_total'] = subtotal_value
+            bill_dict['taxes'] = []
+            for i,tax in enumerate(tax_list):
+                bill_dict['taxes'].append({})
+                bill_dict['taxes'][i]['type'] = tax['type']
+                bill_dict['taxes'][i]['rate'] = tax['rate']
+                bill_dict['taxes'][i]['amount'] = tax['amount']
+            bill_dict['total_tax'] = tax_amount
+            bill_dict['total_paid'] = total_amount
+            bill_dict['bill_meta'] = {}
+            #with columsns of bill meta ask user to enter key and value
+            # meta_columns = st.columns(2)
+            for i in range(no_of_meta):
+                # key = meta_columns[0].text_input('Key '+str(i),)
+                key = 'key_'+str(i)
+                value = st.text_input('Value for key_'+str(i),bill_meta['key_'+str(i)])#meta_columns[1].text_input('Value '+str(i),'')
+                bill_dict['bill_meta'][key] = value
+            # st.write('Bill meta :',bill_dict)
+
+            # bill_dict['bill_meta']['key_1'] = st.text_input('Key 1',key_1)
+            # bill_dict['bill_meta']['key_2'] = st.text_input('Key 2',key_2)
+        st.write(bill_dict)
+        # st.json(bill_dict)
+        print(json.dumps(bill_dict))
+        #st.write(json.dumps(bill_dict, indent=4))
+        #st.write(json.dumps(bill_dict, indent=4, sort_keys=True))
+        json_output = json.dumps(bill_dict)
+
+
 
         """### Plots"""
         # expander for plots 

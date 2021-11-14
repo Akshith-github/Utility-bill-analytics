@@ -12,6 +12,8 @@ import plotly.graph_objects as go
 import json
 import datetime
 
+#mongodb+srv://achuth:<password>@cluster0.j1thl.mongodb.net/myFirstDatabase?retryWrites=true&w=majority
+
 st.set_page_config(layout='wide')
 # float_cond lambda function to check given text is float or number or not
 def float_cond(text):
@@ -25,7 +27,6 @@ menu_bars=["Easy Ocr","Keras OCR","Vision API","OCR Space","Google Tesseract","I
 choice = st.sidebar.selectbox("Select Menu",menu_bars)
 
 
-#mongodb+srv://achuth:<password>@cluster0.4xbkl.mongodb.net/myFirstDatabase?retryWrites=true&w=majority
 @st.cache
 def load_model(): 
     reader = ocr.Reader(['en'],model_storage_directory='.',cudnn_benchmark=True)
@@ -543,7 +544,24 @@ if choice == "Easy Ocr":
         #st.write(json.dumps(bill_dict, indent=4, sort_keys=True))
         json_output = json.dumps(bill_dict)
 
+        #client = pymongo.MongoClient("mongodb+srv://kluuser:<password>@cluster0.zjawa.mongodb.net/myFirstDatabase?retryWrites=true&w=majority")
+        #db = client.test
 
+        if st.button("add to database"):
+            with st.spinner("Saving.."):
+                client = pymongo.MongoClient("mongodb+srv://kluuser:1234@cluster0.zjawa.mongodb.net/DB?retryWrites=true&w=majority")
+                database  = client["DB"]
+                collection = database["test"]
+                post1 = bill_dict
+                curr_saved = collection.insert_one(post1)
+                curr_saved_rec = collection.find({"_id":curr_saved.inserted_id})
+                records = [i for i in curr_saved_rec]
+                with st.expander("saved as"):
+                    st.write(records)
+                st.success("Saved Successfully")
+
+        #cluster = MongoClient("mongodb+srv://achuth:1234@cluster0.j1thl.mongodb.net/easyocr?ssl=true&ssl_cert_reqs=CERT_NONE")
+        
 
         """### Plots"""
         # expander for plots 

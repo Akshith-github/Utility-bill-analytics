@@ -770,9 +770,134 @@ if page == "SavedBills":
         with cols[5].expander("More about Bill Item "+str(no+1)):
             st.write(i)
 
-
+# cachefunction for  connection of pymongo/mongo db 
+@st.cache
+def get_mongo_db_collection(time=0):
+    # mongodb connection
+    client = pymongo.MongoClient("mongodb+srv://kluuser:1234@cluster0.zjawa.mongodb.net/DB?retryWrites=true&w=majority")
+    database  = client["DB"]
+    collection = database["test"]
+    records = [i for i in collection.find()]
+    for i in records:
+        i['_id'] = str(i['_id'])
+    #close client
+    client.close()
+    return records
+time = 0
 if page == "Dashboard":
-    st.title("this is about page")
+    headercols = st.columns([6,2])
+    headercols[0].write("### Welcome to the Dashboard")
+    if headercols[1].button("Refresh for Newbills"):
+        time +=1
+    records = get_mongo_db_collection(time)
+    
+    st.markdown("### Total No of records: {}".format(len(records)))
+    # convert bills json format recoreds to pandas dataframe
+    df = pd.DataFrame(records)
+    # print datatypes of each column
+    # st.write(str(df.dtypes))
+    # st.write(df[df["_id"]=="61910cd4f7194e9b00a057b2"]["bill_items"].values[0])
+    st.dataframe(df)
+    # bill_date vs total paid plot
+    # st.write(df.groupby(["bill_date"]).sum()["total_paid"].plot(kind="bar"))
+    # st.pyplot()
+    headplotcols = st.columns(2)
+    fig = go.Figure(data = [go.Scatter(x=df.groupby(["bill_date"]).count().index ,y=df.groupby(["bill_date"]).sum()["total_paid"])],layout=go.Layout(title="Bill Date vs Total Paid"))
+    headplotcols[0].plotly_chart(fig)
+    # bill_date vs bill_records_count plot x = bill_date, y = bill_records_count
+    fig = go.Figure(data = [go.Scatter(x=df.groupby(["bill_date"]).count().index ,y=df.groupby(["bill_date"]).count()["_id"])],layout=go.Layout(title="Bill Date vs Bill Records Count"))
+    headplotcols[1].plotly_chart(fig)
+
+
+
+    latest_date = df['bill_date'].sort_values(ascending=True).tail(1)
+    st.write("### Latest Bill Date: {}".format(latest_date.values[0]))
+    with st.expander("latest bill analysis"):
+        st.table(df[df['bill_date']==latest_date.values[0]].tail(1))
+        target_df = df[df['bill_date']==latest_date.values[0]].tail(1)
+        # using json string stored in bill_items of target_df to convert to pandas dataframe
+        # target_df['bill_items'] = target_df['bill_items'].apply(lambda x: pd.read_json(x))
+        # st.write(target_df['bill_items'].values[0])
+        #list of items in format [
+        # 0:{
+        # "item_name":"1xT-Shirt"
+        # "":525.5
+        # }
+        # ]
+        # to dataframe 
+        target_df['bill_items'] = target_df['bill_items'].apply(lambda x: pd.DataFrame(x))
+        # display with height=1000
+        st.dataframe(target_df['bill_items'].values[0],height=1000)
+        # st.write(pd.read_json(target_df['bill_items'].values[0]))
+        st.write(df.shape)
+        latest_items_df = target_df['bill_items'].values[0]
+        # iter rows of dataframe and print dataframe of item_bills in each row
+        # for i in df.itertuples():
+            # st.dataframe(i.bill_items)
+
+        # fig = go.Figure(data=[go.Pie(labels= latest_date, values=df[df['bill_date']==latest_date].values[])])
+        # Using the latest_items_df to plot pie chart of items features
+        plotcols = st.columns(2)
+        for col in latest_items_df.columns:
+            if col != "item_name":
+                fig = go.Figure(data=[go.Pie(labels= latest_items_df[col].values, values=latest_items_df[col].values)])
+                plotcols[0].plotly_chart(fig)
+        # all cols group bar chart x = item_name y = all other columns except item_name
+        fig = go.Figure(data=[go.Bar(x=latest_items_df['item_name'].values,y=latest_items_df.drop(columns=['item_name']).sum().values)])
+        plotcols[1].plotly_chart(fig)
+    # As in savedbills page we have to give filter options to filter the records
+    # use slider to filter the records with amount greater than x
+    st.write(max(df['total_paid'].values),type(max(df['total_paid'].values)))
+    amtfiltercols = st.columns(2)
+    amount_slider = amtfiltercols[0].slider("Filter by Amount",0,int(max(df['total_paid'].values))+1,(0,int(max(df['total_paid'].values))+1))
+    amtfiltercols[1].write(" apply ")
+    amtfilter=amtfiltercols[1].checkbox("Filter by Amount")
+    # cols3= st.columns(3)
+    # cols3[0].dataframe(df['total_paid']>=amount_slider[0])
+    # cols3[1].dataframe(df['total_paid']<=amount_slider[1])
+    # cols3[2].dataframe(df['total_paid'])
+    # st.write(df[df['total_paid']>=amount_slider[0]][df['total_paid']<=amount_slider[1]])
+    result_df = df[(df['total_paid']>=amount_slider[0]) & (df['total_paid']<=amount_slider[1])] if amtfilter else df
+
+    # similarly we can filter the records with bill_date greater than x get start data and end date
+    st.write(df['bill_date'].min(),type(df['bill_date'].min()))
+    datefiltercols = st.columns(3)
+    start_date = datefiltercols[0].date_input("Start Date",datetime.datetime.strptime(df['bill_date'].min(),'%Y-%m-%d'))
+    end_date = datefiltercols[1].date_input("End Date",datetime.datetime.strptime(df['bill_date'].max(),'%Y-%m-%d'))
+    datefiltercols[2].write(" apply ")
+    datefilter = datefiltercols[2].checkbox("Filter by Date")
+    st.write(start_date,end_date)
+    result_df = result_df[(result_df['bill_date']>=start_date) & (result_df['bill_date']<=end_date)] if datefilter else result_df
+
+    # filter the total_tax greater than x and less than y
+    taxfiltercols = st.columns(3)
+    tax_slider = taxfiltercols[0].slider("Filter by Tax",0,int(max(result_df['total_tax'].values))+1,(0,int(max(result_df['total_tax'].values))+1))
+    taxfiltercols[2].write(" apply ")
+    taxfilter = taxfiltercols[2].checkbox("Filter by Tax")
+    result_df = result_df[(result_df['total_tax']>=tax_slider[0]) & (result_df['total_tax']<=tax_slider[1])] if taxfilter else result_df
+
+    # filter with regular expression string from user input on column name  is also from dropdown annd also have check box for exact case match
+    regexfiltercols = st.columns(4)
+    regex_string = regexfiltercols[0].text_input("Filter by Regex")
+    case_flag = regexfiltercols[1].checkbox("Case Sensitive")
+    regex_col = regexfiltercols[2].selectbox("Filter by Regex Column",df.columns)
+    regexfiltercols[3].write(" apply ")
+    regexfilter = regexfiltercols[3].checkbox("Filter by Regex")
+    result_df = result_df[result_df[regex_col].str.contains(regex_string,case=case_flag)] if regexfilter else result_df
+    # result_df = result_df[result_df[regex_col].str.contains(regex_string)] if regexfilter else result_df
+
+    st.table(result_df)
+
+    
+    
+    # word cloud of all items with item_name as text and total_paid as weight
+    # use plotly package functions to create word cloud
+    
+
+
+    # with st.expander("## date vs bills"):
+        
+        
 
 
 

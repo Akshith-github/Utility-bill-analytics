@@ -791,7 +791,7 @@ if page == "Dashboard":
         time +=1
     records = get_mongo_db_collection(time)
     
-    st.markdown("### Total No of records: {}".format(len(records)))
+    st.markdown("--- \n ### Total No of records: {}".format(len(records)))
     # convert bills json format recoreds to pandas dataframe
     df = pd.DataFrame(records)
     # print datatypes of each column
@@ -801,6 +801,7 @@ if page == "Dashboard":
     # bill_date vs total paid plot
     # st.write(df.groupby(["bill_date"]).sum()["total_paid"].plot(kind="bar"))
     # st.pyplot()
+    st.markdown("--- \n ### Timeline based analysis")
     headplotcols = st.columns(2)
     fig = go.Figure(data = [go.Scatter(x=df.groupby(["bill_date"]).count().index ,y=df.groupby(["bill_date"]).sum()["total_paid"])],layout=go.Layout(title="Bill Date vs Total Paid"))
     headplotcols[0].plotly_chart(fig)
@@ -811,7 +812,7 @@ if page == "Dashboard":
 
 
     latest_date = df['bill_date'].sort_values(ascending=True).tail(1)
-    st.write("### Latest Bill Date: {}".format(latest_date.values[0]))
+    st.write("--- \n ### Latest Bill Date: {}".format(latest_date.values[0]))
     with st.expander("latest bill analysis"):
         st.table(df[df['bill_date']==latest_date.values[0]].tail(1))
         target_df = df[df['bill_date']==latest_date.values[0]].tail(1)
@@ -845,48 +846,174 @@ if page == "Dashboard":
         # all cols group bar chart x = item_name y = all other columns except item_name
         fig = go.Figure(data=[go.Bar(x=latest_items_df['item_name'].values,y=latest_items_df.drop(columns=['item_name']).sum().values)])
         plotcols[1].plotly_chart(fig)
-    # As in savedbills page we have to give filter options to filter the records
-    # use slider to filter the records with amount greater than x
-    st.write(max(df['total_paid'].values),type(max(df['total_paid'].values)))
-    amtfiltercols = st.columns(2)
-    amount_slider = amtfiltercols[0].slider("Filter by Amount",0,int(max(df['total_paid'].values))+1,(0,int(max(df['total_paid'].values))+1))
-    amtfiltercols[1].write(" apply ")
-    amtfilter=amtfiltercols[1].checkbox("Filter by Amount")
-    # cols3= st.columns(3)
-    # cols3[0].dataframe(df['total_paid']>=amount_slider[0])
-    # cols3[1].dataframe(df['total_paid']<=amount_slider[1])
-    # cols3[2].dataframe(df['total_paid'])
-    # st.write(df[df['total_paid']>=amount_slider[0]][df['total_paid']<=amount_slider[1]])
-    result_df = df[(df['total_paid']>=amount_slider[0]) & (df['total_paid']<=amount_slider[1])] if amtfilter else df
+    st.write("--- \n ### Filter the bills and get plots")
+    with st.expander("Filter the bills and get plots"):
+        # As in savedbills page we have to give filter options to filter the records
+        # use slider to filter the records with amount greater than x
+        st.write(max(df['total_paid'].values),type(max(df['total_paid'].values)))
+        amtfiltercols = st.columns(2)
+        amount_slider = amtfiltercols[0].slider("Filter by Amount",0,int(max(df['total_paid'].values))+1,(0,int(max(df['total_paid'].values))+1))
+        amtfiltercols[1].write(" apply ")
+        amtfilter=amtfiltercols[1].checkbox("Filter by Amount")
+        # cols3= st.columns(3)
+        # cols3[0].dataframe(df['total_paid']>=amount_slider[0])
+        # cols3[1].dataframe(df['total_paid']<=amount_slider[1])
+        # cols3[2].dataframe(df['total_paid'])
+        # st.write(df[df['total_paid']>=amount_slider[0]][df['total_paid']<=amount_slider[1]])
+        result_df = df[(df['total_paid']>=amount_slider[0]) & (df['total_paid']<=amount_slider[1])] if amtfilter else df
 
-    # similarly we can filter the records with bill_date greater than x get start data and end date
-    st.write(df['bill_date'].min(),type(df['bill_date'].min()))
-    datefiltercols = st.columns(3)
-    start_date = datefiltercols[0].date_input("Start Date",datetime.datetime.strptime(df['bill_date'].min(),'%Y-%m-%d'))
-    end_date = datefiltercols[1].date_input("End Date",datetime.datetime.strptime(df['bill_date'].max(),'%Y-%m-%d'))
-    datefiltercols[2].write(" apply ")
-    datefilter = datefiltercols[2].checkbox("Filter by Date")
-    st.write(start_date,end_date)
-    result_df = result_df[(result_df['bill_date']>=start_date) & (result_df['bill_date']<=end_date)] if datefilter else result_df
+        # similarly we can filter the records with bill_date greater than x get start data and end date
+        st.write(df['bill_date'].min(),type(df['bill_date'].min()))
+        datefiltercols = st.columns(3)
+        start_date = datefiltercols[0].date_input("Start Date",datetime.datetime.strptime(df['bill_date'].min(),'%Y-%m-%d'))
+        end_date = datefiltercols[1].date_input("End Date",datetime.datetime.strptime(df['bill_date'].max(),'%Y-%m-%d'))
+        datefiltercols[2].write(" apply ")
+        datefilter = datefiltercols[2].checkbox("Filter by Date")
+        st.write(start_date,end_date)
+        result_df = result_df[(result_df['bill_date']>=start_date) & (result_df['bill_date']<=end_date)] if datefilter else result_df
 
-    # filter the total_tax greater than x and less than y
-    taxfiltercols = st.columns(3)
-    tax_slider = taxfiltercols[0].slider("Filter by Tax",0,int(max(result_df['total_tax'].values))+1,(0,int(max(result_df['total_tax'].values))+1))
-    taxfiltercols[2].write(" apply ")
-    taxfilter = taxfiltercols[2].checkbox("Filter by Tax")
-    result_df = result_df[(result_df['total_tax']>=tax_slider[0]) & (result_df['total_tax']<=tax_slider[1])] if taxfilter else result_df
+        # filter the total_tax greater than x and less than y
+        taxfiltercols = st.columns(3)
+        tax_slider = taxfiltercols[0].slider("Filter by Tax",0,int(max(result_df['total_tax'].values))+1,(0,int(max(result_df['total_tax'].values))+1))
+        taxfiltercols[2].write(" apply ")
+        taxfilter = taxfiltercols[2].checkbox("Filter by Tax")
+        result_df = result_df[(result_df['total_tax']>=tax_slider[0]) & (result_df['total_tax']<=tax_slider[1])] if taxfilter else result_df
 
-    # filter with regular expression string from user input on column name  is also from dropdown annd also have check box for exact case match
-    regexfiltercols = st.columns(4)
-    regex_string = regexfiltercols[0].text_input("Filter by Regex")
-    case_flag = regexfiltercols[1].checkbox("Case Sensitive")
-    regex_col = regexfiltercols[2].selectbox("Filter by Regex Column",df.columns)
-    regexfiltercols[3].write(" apply ")
-    regexfilter = regexfiltercols[3].checkbox("Filter by Regex")
-    result_df = result_df[result_df[regex_col].str.contains(regex_string,case=case_flag)] if regexfilter else result_df
-    # result_df = result_df[result_df[regex_col].str.contains(regex_string)] if regexfilter else result_df
+        # filter with regular expression string from user input on column name  is also from dropdown annd also have check box for exact case match
+        regexfiltercols = st.columns(4)
+        regex_string = regexfiltercols[0].text_input("Filter by Regex")
+        case_flag = regexfiltercols[1].checkbox("Case Sensitive")
+        regex_col = regexfiltercols[2].selectbox("Filter by Regex Column",df.columns)
+        regexfiltercols[3].write(" apply ")
+        regexfilter = regexfiltercols[3].checkbox("Filter by Regex")
+        result_df = result_df[result_df[regex_col].str.contains(regex_string,case=case_flag)] if regexfilter else result_df
+        # result_df = result_df[result_df[regex_col].str.contains(regex_string)] if regexfilter else result_df
+        # with st.expander("Show Filtered Data"):
+        st.table(result_df)
 
-    st.table(result_df)
+        # now on the the extracted result_df a custom plot ui with plolt user can select which type of plot to plot and also can filter the dataframe with the selected columns and decide the values to x column and y column or other based on the plot type
+        #get plot type from user
+        customplotcols = st.columns([1,2])
+        plot_type = customplotcols[0].selectbox("Select Plot Type",["Scatter","Bar","Pie"])
+        # get the columns from user
+        # filter columns that are not suitable for plot based on dtype of column also include string columns
+        eligible_cols = result_df.columns[result_df.dtypes.isin(['int64','float64','object'])]
+        plot_cols = customplotcols[0].multiselect("Select Columns",result_df.columns)
+        # get the x and y columns from user
+        x_col = customplotcols[0].selectbox("Select X Column",plot_cols)
+        y_col = customplotcols[0].selectbox("Select Y Column",plot_cols)
+        # get the plot title from user
+        plot_title = customplotcols[0].text_input("Plot Title","" if (x_col and y_col) else x_col+" vs "+y_col if (x_col!=y_col) else x_col)
+        # get the plot description from user
+        plot_desc = customplotcols[0].text_input("Plot Description")
+        # Now we have to plot the dataframe based on the plot type
+        customplotcols[1].write("--- \n plot is displayed here")
+        if x_col and y_col:
+            if plot_type == "Scatter":
+                fig = go.Figure(data=[go.Scatter(x=result_df[x_col].values,y=result_df[y_col].values)])
+                fig.update_layout(title=plot_title,xaxis_title=x_col,yaxis_title=y_col)
+                customplotcols[1].plotly_chart(fig)
+            elif plot_type == "Bar":
+                fig = go.Figure(data=[go.Bar(x=result_df[x_col].values,y=result_df[y_col].values)])
+                fig.update_layout(title=plot_title,xaxis_title=x_col,yaxis_title=y_col)
+                customplotcols[1].plotly_chart(fig)
+            elif plot_type == "Pie":
+                fig = go.Figure(data=[go.Pie(labels=result_df[x_col].values,values=result_df[y_col].values)])
+                fig.update_layout(title=plot_title,xaxis_title=x_col,yaxis_title=y_col)
+                customplotcols[1].plotly_chart(fig)
+            else:
+                customplotcols[1].write("Invalid Plot Type")
+        customplotcols[1].write("---")
+    st.write("--- \n ### items data based plots")
+    # generate items dataframe from the result_df and show the items in a dataframe extract it out of json format and show it in a dataframe
+    with st.expander("Configure data frame column names for Better Analytics"):
+        item_dfs=[]
+        for i in range(len(result_df)):
+            # print bill_items column
+            item_bills = result_df.iloc[i]['bill_items']
+            # [{"":null,"Amount":136,"Mrp":70,"Price":null,"Qty":2,"Rate":68,"item_name":"ID WHEAT CHAPATI"},{"":null,"Amount":103.5,"Mrp":105,"Price":null,"Qty":1,"Rate":103.51,"item_name":"PARACHUTE"},{"":null,"Amount":130,"Mrp":135,"Price":null,"Qty":1,"Rate":130,"item_name":"Tea"}]
+            # or
+            #[{"":null,"Amount":120,"Mrp":null,"Price":null,"Qty":null,"Rate":null,"item_name":"Chicken Burger"},{"":null,"Amount":280,"Mrp":null,"Price":null,"Qty":null,"Rate":null,"item_name":"Beer"}]
+            # analyze json list and extract the items
+            # for i in item_bills:
+            #     st.write(i)
+                # {
+                # "item_name":"1xT-Shirt"
+                # "":525.5
+                # } to dataframe
+            item_df = pd.DataFrame(item_bills)
+            # append store details to each item row in the item_df
+            # store_name, store_description, store_address, store_gstin, bill_identifier ,bill_date ,sub_total , total_tax,total_paid, bill_meta_data @ {
+            #     "uid": "ADMIN",
+            #     "table_no": "24",
+            #     "kot_no": "28,33"
+            # },
+            column_names = item_df.columns
+            # st.write(item_df.columns)
+            cols = st.columns(len(column_names))
+            column_names = [cols[col].text_input(column_names[col]+"label for"+str(i),column_names[col]) for col in range(len(column_names))]
+            item_df.columns = column_names
+            item_df['store_name'] = result_df.iloc[i]['store_name']
+            item_df['store_description'] = result_df.iloc[i]['store_description']
+            item_df['store_address'] = result_df.iloc[i]['store_address']
+            item_df['store_gstin'] = result_df.iloc[i]['store_gstin']
+            item_df['bill_identifier'] = result_df.iloc[i]['bill_identifier']
+            item_df['bill_date'] = result_df.iloc[i]['bill_date']
+            item_df['sub_total'] = result_df.iloc[i]['sub_total']
+            item_df['total_tax'] = result_df.iloc[i]['total_tax']
+            item_df['total_paid'] = result_df.iloc[i]['total_paid']
+            item_df['bill_meta_data_uid'] = result_df.iloc[i]['bill_meta_data']['uid']
+            item_df['bill_meta_data_table_no'] = result_df.iloc[i]['bill_meta_data']['table_no']
+            item_df['bill_meta_data_kot_no'] = result_df.iloc[i]['bill_meta_data']['kot_no']
+            # now show the item_df
+            # st.table(item_df)
+            # give column names in text input so user can rename them
+            # each column name in one text input
+            # show the item_df in a dataframe
+            st.dataframe(item_df)
+            # append the item_df to the list
+            item_dfs.append(item_df)
+    # if column names finalized(@ use checkbox) then the following code will run
+    if st.checkbox("Finalize Column Names"):
+        # concat item_dfs into one dataframe
+        item_df = pd.concat(item_dfs)
+        # show the item_df
+        with st.expander("Show the Items dataframe"):
+            st.dataframe(item_df)
+        # st.table(item_df)
+        st.write("--- \n ### items data based plots")
+        # Now we have to plot the dataframe based on the plot type
+        # inputs column to group by column to use for x axis and y axis
+        groupby_col = st.selectbox("Select the column to group by",item_df.columns)
+        # show the dataframe in after grouping
+        with st.expander("Show the Items dataframe after grouping"):
+            st.dataframe(item_df.groupby(groupby_col).agg(['sum','mean','max','min']))
+        # inputs column to plot on x axis and y axis
+        item_customplotcols = st.columns([2,3])
+        item_customplotcols[0].write("---")
+        x_col = item_customplotcols[0].selectbox("Select the column to plot on x axis",item_df.columns)
+        y_col = item_customplotcols[0].selectbox("Select the column to plot on y axis",item_df.columns)
+        # inputs plot type
+        plot_type = item_customplotcols[0].selectbox("Select the plot type",["Bar","Line","Pie"])
+        # inputs plot title
+        plot_title = item_customplotcols[0].text_input("Enter the plot title")
+        # now plot the dataframe
+        item_customplotcols[1].write("Plot the Items dataframe")
+        if plot_type == "Bar":
+            fig = go.Figure(data=[go.Bar(x=item_df[x_col].values,y=item_df[y_col].values)])
+            fig.update_layout(title=plot_title,xaxis_title=x_col,yaxis_title=y_col)
+            item_customplotcols[1].plotly_chart(fig)
+        elif plot_type == "Line":
+            fig = go.Figure(data=[go.Scatter(x=item_df[x_col].values,y=item_df[y_col].values)])
+            fig.update_layout(title=plot_title,xaxis_title=x_col,yaxis_title=y_col)
+            item_customplotcols[1].plotly_chart(fig)
+        elif plot_type == "Pie":
+            fig = go.Figure(data=[go.Pie(labels=item_df[x_col].values,values=item_df[y_col].values)])
+            fig.update_layout(title=plot_title,xaxis_title=x_col,yaxis_title=y_col)
+            item_customplotcols[1].plotly_chart(fig)
+        else:
+            item_customplotcols[1].write("Invalid Plot Type")
+
 
     
     

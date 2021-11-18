@@ -2,3 +2,9 @@
 craft_mlt_25k.pth
 english_g2.pth
 mongosyntax.py
+Research Paper Utility-bill-analytics.txt
+__pycache__/*
+temp/*
+run.sh
+log.*
+form_data.csv

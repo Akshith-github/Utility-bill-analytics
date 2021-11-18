@@ -9,8 +9,25 @@ import pandas as pd
 # import as go from plotly
 import plotly.express as px
 import plotly.graph_objects as go
-import json
-import datetime
+import json , os ,re
+from datetime import datetime
+from predictor import jsonPredictionFromImage
+import random as rd
+# functionality for combinations of items
+from itertools import combinations
+
+@st.cache
+def getjsonprediction(image):
+    # st.write("Got",type(image))
+    # convert numpy array to binary foramt data_bytes
+    #unique name to save image in temp folder 
+    # get random number to avoid name conflict
+    image_name = 'temp/'+str(datetime.now())+str(rd.randint(1,1000000))+'.jpeg'
+    image.save(image_name)
+    prediction = jsonPredictionFromImage(imgfilename=image_name)
+    # clear temp folder
+    os.remove(image_name)
+    return prediction
 
 #mongodb+srv://achuth:<password>@cluster0.j1thl.mongodb.net/myFirstDatabase?retryWrites=true&w=majority
 
@@ -29,17 +46,64 @@ def load_model():
     return reader 
 @st.cache
 def draw_boxes(image, result, color='blue', width=2):
-            draw = ImageDraw.Draw(image)
-            for line in result:
-                p0, p1, p2, p3 = line[0]
-                draw.line([*p0, *p1, *p2, *p3, *p0], fill=color, width=width)
-            return image
+    draw = ImageDraw.Draw(image)
+    for line in result:
+        print(line[0])
+        print("\n\n")
+        p0, p1, p2, p3 = line[0]
+        draw.line([*p0, *p1, *p2, *p3, *p0], fill=color, width=width)
+    return image
+@st.cache
+def draw_boxes_v1(image, json_boundary_result, color='blue', width=2):
+    draw = ImageDraw.Draw(image)
+    # [{"text": "NICEk MART SUPER MARKET","boundingBox": [43,6,508,7,508,29,43,27],
+    #   "words": [{"text": "NICE","boundingBox": [44, 6,117,6,117,28,43,27],"confidence": 0.986},{"text": "MART","boundingBox": [145,6,227,6,226,28,144,28],"confidence": 0.993},...]}]
+    for line in json_boundary_result:
+        # p0, p1, p2, p3 = line['boundingBox']
+        draw.line(line['boundingBox'], fill=color, width=width)
+    return image
 
 @st.cache
 def read_text_from_image(input_image):
-    a = reader.readtext(np.array(input_image))
+    a = reader.readtext(input_image)
     print(*a,sep="\n")
     return a
+
+@st.cache
+def items_from_json(items_json_data):
+    """ "Items": {"type": "array","valueArray": [
+        *******************input**************************
+    ]"""
+    #json format is like this
+    # [{"type":"object",
+    #    "valueObject":
+    #           {"Name":
+    #               {"type":"string",
+    #                 "valueString":".....",
+    #                 "text":"....",
+    #                  "boundingBox":[...]},
+    #              "Price":{},"Quantity":{},
+    #               "TotalPrice":{}}},
+    #   {"type":"object",
+    #       "valueObject":
+    #              {"Name":{..},"Price":{..},"Quantity":{..},"TotalPrice":{..}}
+    #  }]
+    items = [];cols=[]
+    for i,item in enumerate(items_json_data):
+        item_dict = {}
+        for key in item['valueObject']:
+            if i == 0:
+                cols.append(key)
+            if item['valueObject'][key]['type'] == 'string':
+                item_dict[key] = item['valueObject'][key]['valueString'] if item['valueObject'][key]['valueString'] else item['valueObject'][key]['text']
+            elif item['valueObject'][key]['type'] == 'number':
+                item_dict[key] = item['valueObject'][key]['valueNumber'] if item['valueObject'][key]['valueNumber'] else item['valueObject'][key]['text']
+            else:
+                item_dict[key] = item['valueObject'][key]['text']
+        items.append(item_dict)
+    return pd.DataFrame(pd.read_json(json.dumps(items))),cols
+
+
 
 pages = ["DigitalizeBill","SavedBills","Dashboard"] #"HomePage",
 page = st.sidebar.selectbox("Select Page",pages)
@@ -62,6 +126,7 @@ if page == "DigitalizeBill":
         if image is not None:
 
             input_image = Image.open(image) #read image
+            copy_image = input_image.copy() #copy image
 
             with st.expander("Uploaded Image > OCR PART"):
                 st.image(input_image) #display image
@@ -76,7 +141,24 @@ if page == "DigitalizeBill":
                     st.image(boxed_img)
                     st.sidebar.image(boxed_img)
             st.write(result_text) 
-            
+            main_json={}
+            # get json prediction from image
+            with st.expander("Uploaded Image > JSON Prediction"):
+                st.image(copy_image) #display image
+                with st.spinner("Processing ..."):
+                    json_prediction = getjsonprediction(copy_image)
+                    st.image(draw_boxes_v1(copy_image,json_prediction['analyzeResult']['readResults'][0]['lines']))
+                    st.write(json_prediction['analyzeResult']['documentResults'][0]['fields'])
+                    main_json = json_prediction['analyzeResult']['documentResults'][0]['fields']
+            # st.dataframe(items_from_json(main_json['Items']['valueArray'])[0])
+            preddf,predcols=[],[]
+            if "Items" in main_json:
+                preddf,predcols = items_from_json(main_json['Items']['valueArray'])
+                if "Name" in predcols:
+                    predcols.remove("Name")
+                st.dataframe(preddf)
+                st.write(predcols)
+
             #Firstly get user to assign store details as of target_format.json file 
             #prompt user with text from result_text as suggestion 
             #{"store_name": "Lucky Restaurant", 
@@ -96,9 +178,14 @@ if page == "DigitalizeBill":
             """### Store Details"""
             with st.expander("Store Details"):
                 # Give options to user from result_text if no option in result_text then prompt user to enter manually
-                store_name = st.multiselect("Select Store Name",result_text+["Enter Manually"])
-                if store_name == ["Enter Manually"]:
-                    store_name = st.text_input("Enter Store Name")
+                store_name_choice = st.multiselect("Select Store Name",result_text+["Enter Manually"])
+                merchant_name = main_json['MerchantName'] if 'MerchantName' in main_json else ""
+                if merchant_name:
+                    merchant_name = merchant_name['valueString'] if 'valueString' in merchant_name else merchant_name['text'] if 'text' in merchant_name else merchant_name
+                if store_name_choice == ["Enter Manually"]:
+                    store_name = st.text_input("Enter Store Name",merchant_name)
+                elif not store_name_choice:
+                    store_name = st.text_input("Enter Store Name",merchant_name)
                 else:
                     #based on the user input create concated string of selected options and prompt in new text input box as user can correct it if any spelling mistake
                     store_name = " ".join(store_name)
@@ -112,12 +199,18 @@ if page == "DigitalizeBill":
                     store_description = " ".join(store_description)
                     store_description = st.text_input("Enter Store Description",store_description)
                 # similarly for store address we need to first have selectbox followed by text input box
-                store_address = st.multiselect("Select Store Address",result_text+["Enter Manually"])
-                if store_address == ["Enter Manually"]:
+                store_address_choice = st.multiselect("Select Store Address",result_text+["Enter Manually"])
+                merchant_address = main_json['MerchantAddress'] if 'MerchantAddress' in main_json else ""
+                if merchant_address:
+                    merchant_address = merchant_address['valueString'] if 'valueString' in merchant_address else merchant_address['text'] if 'text' in merchant_address else merchant_address
+                if store_address_choice == ["Enter Manually"]:
                     store_address = st.text_input("Enter Store Address")
+                elif not store_address_choice:
+                    store_address = st.text_input("Enter Store Address",merchant_address)
                 else:
                     store_address = " ".join(store_address)
                     store_address = st.text_input("Enter Store Address",store_address)
+                    
                 # similarly for store gstin we need to first have selectbox followed by text input box
                 store_gstin = st.multiselect("Select Store GSTIN",result_text+["Enter Manually"])
                 if store_gstin == ["Enter Manually"]:
@@ -133,13 +226,44 @@ if page == "DigitalizeBill":
                     bill_identifier = " ".join(bill_identifier)
                     bill_identifier = st.text_input("Enter Bill Identifier",bill_identifier)
                 # similarly for bill date we need to first have selectbox followed by text input box
-                bill_date = st.multiselect("Select Bill Date",result_text+["Enter Manually"])
+                transaction_date = main_json['TransactionDate'] if 'TransactionDate' in main_json else ""
+                # bill_date_choice = st.multiselect("Select Bill Date",result_text+["Enter Manually"])
                 # if bill_date == ["Enter Manually"]:
                 #     bill_date = st.text_input("Enter Bill Date")
                 # else:
                 #     bill_date = " ".join(bill_date)
                 #     bill_date = st.text_input("Enter Bill Date",bill_date)
-                bill_date = st.date_input("Enter Bill Date",datetime.datetime.now())
+                identifiedDate=""
+                if transaction_date:
+                    #check valid date format and convert to date object 
+                    # if valueDate is there in transaction_date then it is of foramt "2021-09-22", convert to date object
+                    if 'valueDate' in transaction_date:
+                        identifiedDate = datetime.strptime(transaction_date['valueDate'], '%Y-%m-%d')
+                    # check all formats of date and convert to date object
+                    # if date is not valid then prompt user to enter manually
+                    else:
+                        # FIND symbol in date string
+                        connectors = re.findall(r'[^\w]',transaction_date['text'])
+                        #list out possible formats of date
+                        formats = [
+                            (d,m,y) for d in ["%d","%D"] for m in ["%b","%B"] for y in ["%y","%Y"]
+                        ]
+                        # make permutation of formats and check if date is valid
+                        formats_permt = [ connector.join(comb) for comb in itertools.combinations(formats,3) for connector in ["-",'/',','] ]
+                        #check if date is in any of the formats
+                        for format in formats:
+                            try:
+                                identifiedDate = datetime.strptime(transaction_date['text'], format)
+                                break
+                            except:
+                                pass
+                        if not identifiedDate:
+                            transaction_date = transaction_date['valueDate'] if 'valueDate' in transaction_date else transaction_date['text']
+                            bill_date_text = st.text_input("Enter Bill Date text correctly",transaction_date)
+                            st.warning("Invalid Date Format Identified")               
+                else:
+                    st.error("Please enter valid date/Failed to find date")
+                bill_date = st.date_input("Enter Bill Date",datetime.now() if not identifiedDate else identifiedDate)
                 # similarly for uid we need to first have selectbox followed by text input box
                 uid = st.multiselect("Select UID",result_text+["Enter Manually"])
                 if uid == ["Enter Manually"]:
@@ -180,6 +304,10 @@ if page == "DigitalizeBill":
             
             """### Process Extracted Text > Item Details"""
             # intially let us consider the text item in result text which has the text item and number item following it in the result text list.
+            # check if main_json has Items
+
+            
+            
             with st.expander("Item Details"):
                 assumed_title_input = ""
                 while True and not assumed_title_input:
@@ -236,19 +364,18 @@ if page == "DigitalizeBill":
                             for i in result_text[result_text.index(title_inp)+1:]    ]
                 # st.write('Items text :',items_text)
                 items_text= st.multiselect('UnSelect Invalid Items',items_text ,default=items_text)
-
                 # get number of values exist for each items
-                no_of_values = int(st.number_input('Number of values',min_value=1))
+                no_of_values = int(st.number_input('Number of values',value=len(predcols) if predcols else 1,min_value=1))
                 st.write('Number of values :',no_of_values)
 
                 # get name for each feature and store in a dictionary {feature_index:feature_name} format
                 feature_name = {}
                 for i in range(no_of_values):
-                    feature_name[i] = st.text_input('Feature {} name'.format(i+1) ,'')
+                    feature_name[i] = st.text_input('Feature {} name'.format(i+1) ,'' if not predcols else predcols[i])
                 st.write('Feature name :',feature_name)
 
                 # get number of items
-                no_of_items = int(st.number_input('Number of items',min_value=1))
+                no_of_items = int(st.number_input('Number of items',min_value=1,value=preddf.shape[0] if predcols else 1))
                 st.write('Number of items :',no_of_items)
 
 
@@ -290,7 +417,7 @@ if page == "DigitalizeBill":
                         col.write("item name")
                         for i in range(items_count):
                             # col.write(items_[i])
-                            items_[i]=col.text_input("item {} name".format(i+1),items_[i])
+                            items_[i]=col.text_input("item {} name".format(i+1),items_[i] if not predcols else preddf.iloc[i,0])
                     else:
                         #print feature_name
                         col.write(feature_name[col_count-1])
@@ -300,7 +427,7 @@ if page == "DigitalizeBill":
                                 items_values_dict[i].append("")
                             items_values_dict[i][col_count-1]=col.text_input(
                                 "item {} {}".format(i+1,feature_name[col_count-1]),
-                                items_values_dict[i][col_count-1])
+                                items_values_dict[i][col_count-1] if not predcols else preddf.iloc[i,col_count])
             # st.write(items_)
             # st.write(items_values_dict)
             items_df = pd.DataFrame.from_dict(
@@ -865,8 +992,8 @@ if page == "Dashboard":
         # similarly we can filter the records with bill_date greater than x get start data and end date
         st.write(df['bill_date'].min(),type(df['bill_date'].min()))
         datefiltercols = st.columns(3)
-        start_date = datefiltercols[0].date_input("Start Date",datetime.datetime.strptime(df['bill_date'].min(),'%Y-%m-%d'))
-        end_date = datefiltercols[1].date_input("End Date",datetime.datetime.strptime(df['bill_date'].max(),'%Y-%m-%d'))
+        start_date = datefiltercols[0].date_input("Start Date",datetime.strptime(df['bill_date'].min(),'%Y-%m-%d'))
+        end_date = datefiltercols[1].date_input("End Date",datetime.strptime(df['bill_date'].max(),'%Y-%m-%d'))
         datefiltercols[2].write(" apply ")
         datefilter = datefiltercols[2].checkbox("Filter by Date")
         st.write(start_date,end_date)

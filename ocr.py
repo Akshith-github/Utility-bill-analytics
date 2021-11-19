@@ -15,6 +15,13 @@ from predictor import jsonPredictionFromImage
 import random as rd
 # functionality for combinations of items
 from itertools import combinations
+def tax_extract(text):
+    a = re.findall(r'[\d\.]+',text)
+    if a:
+        return float("".join(a))
+    else:
+        return 0.0
+
 
 @st.cache
 def getjsonprediction(image):
@@ -48,8 +55,8 @@ def load_model():
 def draw_boxes(image, result, color='blue', width=2):
     draw = ImageDraw.Draw(image)
     for line in result:
-        print(line[0])
-        print("\n\n")
+        # print(line[0])
+        # print("\n\n")
         p0, p1, p2, p3 = line[0]
         draw.line([*p0, *p1, *p2, *p3, *p0], fill=color, width=width)
     return image
@@ -69,7 +76,7 @@ def read_text_from_image(input_image):
     print(*a,sep="\n")
     return a
 
-@st.cache
+@st.cache(allow_output_mutation=True)
 def items_from_json(items_json_data):
     """ "Items": {"type": "array","valueArray": [
         *******************input**************************
@@ -243,17 +250,24 @@ if page == "DigitalizeBill":
                     # if date is not valid then prompt user to enter manually
                     else:
                         # FIND symbol in date string
-                        connectors = re.findall(r'[^\w]',transaction_date['text'])
+                        # connectors = re.findall(r'[^\w]',transaction_date['text'])
                         #list out possible formats of date
                         formats = [
-                            (d,m,y) for d in ["%d","%D"] for m in ["%b","%B"] for y in ["%y","%Y"]
+                            (d,m,y) for d in ["%d","%D"] for m in ["%b","%B","%m","%M"] for y in ["%y","%Y"]
                         ]
                         # make permutation of formats and check if date is valid
-                        formats_permt = [ connector.join(comb) for comb in itertools.combinations(formats,3) for connector in ["-",'/',','] ]
+                        # formats_permt = [ connector.join(list(comb)) for comb in combinations(formats,3) for connector in ["-",'/',','] ]
+                        formats_permt = [ " ".join(comb) for formati in formats for comb in combinations(formati,3) ]
+                        # st.write(formats_permt)
+                        # remove all symbols from transaction_date['text']
+                        checkdate_text = " ".join(re.findall('\w+',transaction_date['text']))
+                        # st.write(checkdate_text)
                         #check if date is in any of the formats
-                        for format in formats:
+                        for format in formats_permt:
                             try:
-                                identifiedDate = datetime.strptime(transaction_date['text'], format)
+                                # st.write(format)
+                                identifiedDate = datetime.strptime(checkdate_text, format)
+                                print("matched pattern {}".format(format))
                                 break
                             except:
                                 pass
@@ -459,11 +473,14 @@ if page == "DigitalizeBill":
                     "item_name":items_[i],
                     **{feature_name[j]:float(items_values_dict[i][j]) for j in range(no_of_values)}}
             st.write('Items json :',items_json)
+            
+            
             """### Subtotal """
-            subtotal_value=0
+            subtotal_value=0 if not "Subtotal" in main_json else main_json["Subtotal"]["valueNumber"] if "valueNumber" in main_json["Subtotal"] else tax_extract(main_json["Subtotal"]["text"])
             with st.expander("subtotal"):
                 # user select one feature for subtotal
-                subtotal_feature = st.multiselect('Select subtotal feature',list(feature_name.values()),default=list(feature_name.values())[-1])
+                lastcol = list(feature_name.values())[-1]
+                subtotal_feature = st.multiselect('Select subtotal feature',list(feature_name.values()),default=lastcol if not predcols else predcols[-1] if items_df[lastcol].sum()==subtotal_value else [])
                 # if user select more than 2 columns then show error
                 if len(subtotal_feature)>2:
                     st.error('Please select only one feature for subtotal')
@@ -496,11 +513,14 @@ if page == "DigitalizeBill":
             #     "amount": "9.29"
             # }
             # prompt user with three inputs tax type, rate and amount
-            
+            # In the loop while creating text_inputs check if Tax in main_json if present ,add intial one as i.e taxlist first element type=>total tax amount=>main_json["Tax"]["valueNumber"] else empty list
             tax_list = []
             with st.expander("taxes"):
                 no_of_taxes = st.slider('No of taxes',1,10,1)
                 taxlist=[{'type':'','rate':0.0,'amount':0.0} for i in range(no_of_taxes)]
+                if "Tax" in main_json:
+                    taxlist[0]['type'] = "TotalTax"
+                    taxlist[0]['amount'] = main_json["Tax"]["valueNumber"] if "valueNumber" in main_json["Tax"] else tax_extract(main_json["Tax"]["text"])
                 # with three columsn ask user to enter tax type, rate and amount for each tax
                 tax_columns = st.columns(3)
                 for i,tax in enumerate(taxlist):
@@ -549,8 +569,14 @@ if page == "DigitalizeBill":
             else:
                 total_amount = subtotal_value
             total_columns[2].write('Total')
-            total_amount = total_columns[2].number_input('Total',total_amount)
+            # predicted Total  
+            predTotal = 0
+            if "Total" in main_json:
+                predTotal = main_json["Total"]["valueNumber"] if "valueNumber" in main_json["Total"] else tax_extract(main_json["Total"]["text"])
+            total_amount = total_columns[2].number_input('Total',total_amount if not predTotal else predTotal)
             st.write('Total :',total_amount)
+
+
                 
             # Similar to taxes dict now bill meta dictionary
             # "bill_meta": { 

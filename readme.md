@@ -1,11 +1,17 @@
 # Utility Bill Analytics
 ---
+Automated Bill/Receipts Recognizer
+--- 
+1. Digitalize bills automatically (Uses Ml models predictions)
+2. Generate reports/Bills
+3. Dashboard and Database Features
+---
 ![image](https://user-images.githubusercontent.com/62134438/141650730-0aa0e733-f69a-468e-973d-fb8ff2f46d06.png)
 ![image](https://user-images.githubusercontent.com/62134438/141650738-2f3efe4c-f49b-4a75-82fc-9a848dbe7cb8.png)
 ---
 ## Steps:
 1. OCR to extract text from bill [ Output : raw text segments]  ✅
-2. Convert Raw text segements into Structred Data **json**   ✅
+2. Convert Raw text segements into Structred Data  **json** using Machine learning models output   ✅
 3. Store the JSON representation of the bill into a database  ✅
 4. Analytics dashboard for stored data  ✅
 ---
@@ -18,5 +24,6 @@
 ---
 ## Usage:
     '''
+    pip install -r requirements.txt
     streamlit run ocr.py
     '''

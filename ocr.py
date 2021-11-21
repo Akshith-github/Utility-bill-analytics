@@ -29,7 +29,12 @@ def getjsonprediction(image):
     # convert numpy array to binary foramt data_bytes
     #unique name to save image in temp folder 
     # get random number to avoid name conflict
-    image_name = 'temp/'+str(datetime.now())+str(rd.randint(1,1000000))+'.jpeg'
+    # if temp folder not present create it
+    if not os.path.exists('temp'):
+        os.makedirs('temp')
+    # space spearated date format for unique name with time
+    unique_name = datetime.now().strftime("%d %b %Y %H-%M-%S")
+    image_name = 'temp/'+unique_name+str(rd.randint(1,1000000))+'.jpeg'
     image.save(image_name)
     prediction = jsonPredictionFromImage(imgfilename=image_name)
     # clear temp folder

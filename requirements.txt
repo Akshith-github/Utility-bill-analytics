@@ -2,4 +2,4 @@ streamlit
 easyocr
 pymongo
 Plotly
-# pymongo[srv]
+pymongo[srv]
